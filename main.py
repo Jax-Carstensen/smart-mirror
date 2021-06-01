@@ -13,8 +13,8 @@ import urllib.request
 class Image:
     def __init__(self, name):
         self.name = name
-        self.image = pygame.image.load(f"images/{self.name}.png")
-        self.image = pygame.transform.scale(self.image, (200, 200)).convert_alpha()
+        self.image = pygame.image.load("/home/pi/Desktop/MagicMirror/images/" + self.name + ".png")
+        self.image = pygame.transform.rotate(pygame.transform.scale(self.image, (200, 200)), 90).convert_alpha()
     
 class Mirror:
     def __init__(self):
@@ -26,7 +26,6 @@ class Mirror:
         self.time_between_weather_calls = 0.5 # In minutes
         self.main_weather = "Clouds"
         self.url = "http://api.openweathermap.org/data/2.5/weather?zip=" + str(ZIP) + ",us&APPID=" + API_KEY
-        print(self.url)
         self.get_weather()
         self.weather_description = "testing"
         pygame.init()
@@ -45,11 +44,9 @@ class Mirror:
         else:
             self.screen = pygame.display.set_mode((self.screen_width, self.screen_height), pygame.FULLSCREEN)
         self.get_weather(force=True)
-        for root, dirs, files in os.walk("./images/"):
+        for root, dirs, files in os.walk("/home/pi/Desktop/MagicMirror/images/"):
             for file in files:
                 self.images.append(Image(file.replace(".png", "")))
-        self.image_width = self.images[0].image.get_rect().size[0] * 0.98
-        self.image_height = self.images[0].image.get_rect().size[1]
         while self.running:
             self.update()
             self.draw()
@@ -61,10 +58,7 @@ class Mirror:
         return None
     
     def draw_weather_icon(self, left_index, right_index):
-        cell = self.image_width / 3
-        self.cell_size = cell
-        rect = (cell * left_index + 16, cell * right_index + 16, cell, cell)
-        self.screen.blit(self.get_image(self.icon_id), (self.screen_width - cell * 2, 128), rect)
+        self.screen.blit(self.get_image(self.icon_id), (self.screen_width - cell * 2, 128))
     
     def connected_to_interwebs(self, host='http://google.com'):
         try:
@@ -107,16 +101,22 @@ class Mirror:
         #Draw your town's name
         self.draw_text(self.town_name, 0, self.screen_height - self.largeFont.size(self.town_name)[0], font=self.largeFont)
         #Draw the weather icon
-        self.screen.blit(self.get_image(self.icon_id), (48, self.screen_height - 200))
+        img = self.get_image(self.icon_id)
+        if img != None:
+            self.screen.blit(img, (48, self.screen_height - 200))
         #Draw the temperature
-        temp_text = f"{self.temperature}°f"
-        min_text  = f"{self.min_temperature}°f"
-        max_text  = f"{self.max_temperature}°f"
+        degree = u"\N{DEGREE SIGN}"
+        temp_text = str(self.temperature) + degree + "f"
+        min_text = str(self.min_temperature) + degree + "f"
+        max_text = str(self.max_temperature) + degree + "f"
+
         self.draw_text(temp_text, 112, self.screen_height - 200 - self.largeFont.size(temp_text)[0] * 1.25, font=self.largeFont)
         self.draw_text(min_text, 196, self.screen_height - 200 - self.font.size(min_text)[0] * 1.15)
         self.draw_text(max_text, 196, self.screen_height - 200 - self.font.size(min_text)[0] * 2.85)
-
-        self.draw_text(self.weather_description, 256, self.screen_height - 100 - self.font.size(self.weather_description)[0] * 0.5)
+        y = self.screen_height - 100 - self.font.size(self.weather_description)[0] * 0.5
+        if y + self.font.size(self.weather_description)[0] > 1080:
+            y = 1080 - self.font.size(self.weather_description)[0]
+        self.draw_text(self.weather_description, 256, y)
     
     def draw_time(self):
         rn = datetime.now()
@@ -128,7 +128,7 @@ class Mirror:
             extra = "P.M."
         t = str(t)
         self.draw_text(t + rn.strftime(":%M:%S"), 72, 0, font=self.extraLargeFont)
-        self.draw_text(datetime.now().strftime("%d/%m/%Y"), 156, 0)
+        self.draw_text(datetime.now().strftime("%m/%d/%Y"), 156, 0)
         #self.draw_text(rn.strftime("%d/%m/%Y"), 72, self.largeFont.size(rn.strftime("%d/%m/%Y"))[0] * 0.55, font=self.largeFont)
         return
         self.draw_text(datetime.now().strftime("%d/%m/%Y"), 40, 40)
