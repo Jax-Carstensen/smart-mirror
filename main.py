@@ -2,7 +2,6 @@
 # pygame, gpiozero, psutil, requests
 from config import *
 import pygame
-from gpiozero import CPUTemperature, LoadAverage
 from datetime import datetime
 import psutil
 import os
@@ -15,6 +14,7 @@ class Image:
     def __init__(self, name):
         self.name = name
         self.image = pygame.image.load(f"images/{self.name}.png")
+        self.image = pygame.transform.scale(self.image, (200, 200)).convert_alpha()
     
 class Mirror:
     def __init__(self):
@@ -26,6 +26,7 @@ class Mirror:
         self.time_between_weather_calls = 0.5 # In minutes
         self.main_weather = "Clouds"
         self.url = "http://api.openweathermap.org/data/2.5/weather?zip=" + str(ZIP) + ",us&APPID=" + API_KEY
+        print(self.url)
         self.get_weather()
         self.weather_description = "testing"
         pygame.init()
@@ -36,18 +37,19 @@ class Mirror:
         self.running = True
         self.font = pygame.font.SysFont("Arial", 30)
         self.largeFont = pygame.font.SysFont("Arial", 65)
+        self.extraLargeFont = pygame.font.SysFont("Arial", 80)
         self.connected = False
         self.icon_id = "01d"
-        for root, dirs, files in os.walk("./images/"):
-            for file in files:
-                self.images.append(Image(file.replace(".png", "")))
-        self.image_width = self.images[0].image.get_rect().size[0] * 0.98
-        self.image_height = self.images[0].image.get_rect().size[1]
         if DEBUG_MODE:
             self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
         else:
             self.screen = pygame.display.set_mode((self.screen_width, self.screen_height), pygame.FULLSCREEN)
         self.get_weather(force=True)
+        for root, dirs, files in os.walk("./images/"):
+            for file in files:
+                self.images.append(Image(file.replace(".png", "")))
+        self.image_width = self.images[0].image.get_rect().size[0] * 0.98
+        self.image_height = self.images[0].image.get_rect().size[1]
         while self.running:
             self.update()
             self.draw()
@@ -98,38 +100,36 @@ class Mirror:
         surface = pygame.transform.rotate(surface, 90)
         self.screen.blit(surface, (x, y))
     
-    def draw_dev_info(self):
-        return
-        if not DEBUG_MODE:
-            return
-        start_x = 0
-        start_y = self.screen_height - 300
-        CPU_temp = CPUTemperature().temperature
-        CPU_percentage = psutil.cpu_percent()
-        used_ram = round(psutil.virtual_memory()[3] / 1024 / 1024, 2)
-        self.draw_text("Temp: " + str(int(CPU_temp)) + "C", start_x, start_y)
-        self.draw_text("CPU:  " + str(CPU_percentage) + "%", start_x, start_y + 40)
-        self.draw_text("RAM:  " + str(used_ram) + "MB (" + str(psutil.virtual_memory()[2]) + "%)", start_x, start_y + 80)
-    
     def draw_weather(self):
+        if not self.connected:
+            self.draw_text("Please connect to the internet", 0, self.screen_height - self.font.size("Please connect to the internet")[0], font=self.font)
+            return
         #Draw your town's name
         self.draw_text(self.town_name, 0, self.screen_height - self.largeFont.size(self.town_name)[0], font=self.largeFont)
         #Draw the weather icon
-        self.screen.blit(self.get_image(self.icon_id), (128, self.screen_height - self.image_width))
-        return
-        if self.main_weather == "Clouds":
-            self.draw_weather_icon(0, 0)
-        elif self.main_weather == "Rain":
-            self.draw_weather_icon(0, 2)
-        else:
-            self.draw_weather_icon(0, 0)
-        self.draw_text(f"{self.temperature}°F", 1720, 128, font=self.largeFont)
-        to_draw = self.weather_description
-        if not self.connected:
-            to_draw = "Please connect to the internet"
-        self.draw_text(to_draw, self.screen_width - self.cell_size, 128 + self.cell_size)
+        self.screen.blit(self.get_image(self.icon_id), (48, self.screen_height - 200))
+        #Draw the temperature
+        temp_text = f"{self.temperature}°f"
+        min_text  = f"{self.min_temperature}°f"
+        max_text  = f"{self.max_temperature}°f"
+        self.draw_text(temp_text, 112, self.screen_height - 200 - self.largeFont.size(temp_text)[0] * 1.25, font=self.largeFont)
+        self.draw_text(min_text, 196, self.screen_height - 200 - self.font.size(min_text)[0] * 1.15)
+        self.draw_text(max_text, 196, self.screen_height - 200 - self.font.size(min_text)[0] * 2.85)
+
+        self.draw_text(self.weather_description, 256, self.screen_height - 100 - self.font.size(self.weather_description)[0] * 0.5)
     
     def draw_time(self):
+        rn = datetime.now()
+        self.draw_text(rn.strftime("%A"), 0, 0, font=self.largeFont)
+        t = int(datetime.now().strftime("%H"))
+        extra = "A.M."
+        if t > 12:
+            t -= 12
+            extra = "P.M."
+        t = str(t)
+        self.draw_text(t + rn.strftime(":%M:%S"), 72, 0, font=self.extraLargeFont)
+        self.draw_text(datetime.now().strftime("%d/%m/%Y"), 156, 0)
+        #self.draw_text(rn.strftime("%d/%m/%Y"), 72, self.largeFont.size(rn.strftime("%d/%m/%Y"))[0] * 0.55, font=self.largeFont)
         return
         self.draw_text(datetime.now().strftime("%d/%m/%Y"), 40, 40)
         t = int(datetime.now().strftime("%H"))
@@ -142,7 +142,6 @@ class Mirror:
     
     def draw(self):
         self.screen.fill((0,0,0))
-        self.draw_dev_info()
         self.draw_time()
         self.draw_weather()
         pygame.display.update()
